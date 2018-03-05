@@ -180,7 +180,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     try:
-            pymisp = PyMISP(args.url, args.key, args.verifycert)
+        pymisp = PyMISP(args.url, args.key, args.verifycert)
     except PyMISPError as e:
-            print(e)
+        print(e)
     PyMISPHelper = PyMISPHelper(pymisp, mode_type=args.eventmode, daily_event_name=args.keyname)
