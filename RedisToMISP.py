@@ -121,7 +121,7 @@ if __name__ == '__main__':
     parser.add_argument("--dailymode", action="store_true",
                         help="By enabling this mode, all push to redis will be stored in the daily event")
     parser.add_argument("--eventname", type=str, default="unamed_daily_event",
-                        help="The daily event name to be used in MISP. (e.g. honeypot_1, will produce each day an event of the form honeypot_1_dd-mm-yyyy")
+                        help="The daily event name to be used in MISP. (e.g. honeypot_1, will produce each day an event of the form honeypot_1 dd-mm-yyyy")
     parser.add_argument("--eventid", type=int, default=None,
                         help="The MISP event id in which to put data. Overwrite dailymode")
 

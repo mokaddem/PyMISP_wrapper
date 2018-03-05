@@ -49,11 +49,11 @@ class PyMISPHelper:
         ---------
         >>> pmhelper = PyMISPHelper(pymisp)
         >>> pmhelper.daily_mode("honeypot_1") # switch to daily mode, so that every addition of attr. or obj. will be pushed to the correct event name
-        >>> pm.add_attributes("ip-src", "8.8.8.8", category="Network Activity") # add an attribute to MISP, as daily mode is activated, no need to supply an event id
-        >>> pm.push_MISP_attributes({"attribute_type": "ip-src", "value": "8.8.8.8", "category": "Network Activity"}) # excatly the same as the previous line
-        >>> pm.add_object("cowrie", {"session": "session_id", "username": "admin", "password": "admin", "protocol": "telnet"}) # add an object to MISP, again no need to give an event id
-        >>> pm.add_sightings(["8.8.8.8", "9.9.9.9"], timestamp=time.time()) # perform a sighting on 8.8.8.8 and 9.9.9.9 
-        >>> pm.push_MISP_sightings({"values": ["8.8.8.8", "9.9.9.9"], "timestamp": time.time()}) # excatly the same as the previous line
+        >>> pmhelper.add_attributes("ip-src", "8.8.8.8", category="Network Activity") # add an attribute to MISP, as daily mode is activated, no need to supply an event id
+        >>> pmhelper.push_MISP_attributes({"attribute_type": "ip-src", "value": "8.8.8.8", "category": "Network Activity"}) # exactly the same as the previous line
+        >>> pmhelper.add_object("cowrie", {"session": "session_id", "username": "admin", "password": "admin", "protocol": "telnet"}) # add an object to MISP, again no need to give an event id
+        >>> pmhelper.add_sightings(["8.8.8.8", "9.9.9.9"], timestamp=time.time()) # perform a sighting on 8.8.8.8 and 9.9.9.9 
+        >>> pmhelper.push_MISP_sightings({"values": ["8.8.8.8", "9.9.9.9"], "timestamp": time.time()}) # exactly the same as the previous line
         """
 
         self.pymisp = pymisp
@@ -276,26 +276,3 @@ class PyMISPHelper:
         if 'errors' in r:
             print(r)
 
-
-if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser()
-
-    # if MISPKeys.py is not present, makes url and key required
-    parser.add_argument("-u", "--url",  type=str, required=not flag_MISPKeys, default=misp_url,
-                        help="The MISP URL to connect to")
-    parser.add_argument("-k", "--key",  type=str, required=not flag_MISPKeys, default=misp_key,
-                        help="The MISP API key")
-    parser.add_argument("--verifycert", action="store_true", default=True,
-                        help="Should the certificate be verified")
-    parser.add_argument("--eventmode", action="store_true",
-                        help="By enabling this mode, all push to redis will be stored in the daily event")
-    parser.add_argument("--keyname", type=str,
-                        help="The daily event name to be used in MISP. (e.g. honeypot_1, will produce each day an event of the form honeypot_1_dd-mm-yyyy")
-    args = parser.parse_args()
-
-    try:
-        pymisp = PyMISP(args.url, args.key, args.verifycert)
-    except PyMISPError as e:
-        print(e)
-    PyMISPHelper = PyMISPHelper(pymisp, mode_type=args.eventmode, daily_event_name=args.keyname)
