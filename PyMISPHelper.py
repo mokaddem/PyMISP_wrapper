@@ -2,11 +2,10 @@
 
 from pymisp.tools.abstractgenerator import AbstractMISPObjectGenerator
 from pymisp.exceptions import PyMISPError
-from pymisp import PyMISP
+from pymisp import PyMISP, MISPAttribute
+import pymisp
 
 from CowrieMISPObject import CowrieMispObject
-from MISPSighting import MISPSighting
-from MISPAttribute import MISPAttribute
 
 try:
     from MISPKeys import misp_url, misp_key
@@ -15,7 +14,6 @@ except ImportError:
     flag_MISPKeys = False
 
 import json, datetime, time, argparse
-from pprint import pprint
 
 
 class PyMISPHelperError(Exception):
@@ -25,6 +23,8 @@ class PyMISPHelperError(Exception):
 class MissingID(PyMISPHelperError):
     pass
 class NotInEventMode(PyMISPHelperError):
+    pass
+class MISPObjectHasNoName(PyMISPHelperError):
     pass
 
 
@@ -47,13 +47,15 @@ class PyMISPHelper:
             The name of the daily event. (It will have the following format on MISP: daily_event_name YYYY-MM-DD)
         Examples:
         ---------
-        >>> pmhelper = PyMISPHelper(pymisp)
-        >>> pmhelper.daily_mode("honeypot_1") # switch to daily mode, so that every addition of attr. or obj. will be pushed to the correct event name
-        >>> pmhelper.add_attributes("ip-src", "8.8.8.8", category="Network Activity") # add an attribute to MISP, as daily mode is activated, no need to supply an event id
-        >>> pmhelper.push_MISP_attributes({"attribute_type": "ip-src", "value": "8.8.8.8", "category": "Network Activity"}) # exactly the same as the previous line
-        >>> pmhelper.add_object("cowrie", {"session": "session_id", "username": "admin", "password": "admin", "protocol": "telnet"}) # add an object to MISP, again no need to give an event id
-        >>> pmhelper.add_sightings(["8.8.8.8", "9.9.9.9"], timestamp=time.time()) # perform a sighting on 8.8.8.8 and 9.9.9.9 
-        >>> pmhelper.push_MISP_sightings({"values": ["8.8.8.8", "9.9.9.9"], "timestamp": time.time()}) # exactly the same as the previous line
+        >>> pymisp = PyMISP(misp_url, misp_key)
+        >>> pm = PyMISPHelper(pymisp)
+        >>> pm.daily_mode("honeypot_1")
+        >>> pm.add_attribute("ip-src", "9.9.9.9", category="Network activity")
+        >>> pm.add_attribute_per_json(json.dumps({"type": "ip-src", "value": "8.9.9.9", "category": "Network activity"}))
+        >>> pm.add_object("cowrie", {"session": "session_id", "username": "admin", "password": "admin", "protocol": "telnet"})
+        >>> pm.add_object_per_json(json.dumps({"name": "cowrie", "session": "session_id", "username": "root", "password": "root", "protocol": "ssh"}))
+        >>> pm.add_sighting(uuid="5a9e6785-2400-4b6a-a707-4581950d210f")
+        >>> pm.add_sighting_per_json({"uuid": "5a9e6bdf-9220-4b8f-ad23-4703950d210f"})
         """
 
         self.pymisp = pymisp
@@ -100,7 +102,7 @@ class PyMISPHelper:
             events.append({'id': e['id'], 'org_id': e['org_id'], 'info': e['info']})
         return events
 
-    def get_daily_event_id(self):
+    def fetch_daily_event_id(self):
         """
         Query MISP to get the correct event id
         """
@@ -146,54 +148,120 @@ class PyMISPHelper:
         """
         if self.mode_type == self.MODE_DAILY:
             if self.current_date != datetime.date.today(): #refresh id
-                self.eventID_to_push = self.get_daily_event_id()
+                self.eventID_to_push = self.fetch_daily_event_id()
             return self.eventID_to_push
         else:
             return None
 
 
-    # HELPERS
-    def add_object(self, misp_object_type, values, event_id=None):
+    # OBJECT
+    def add_object(self, name, dict_values, event_id=None):
         """
         Add an object to MISP
-        Create the correct MISP object depending on the provided misp_object_type
         Parameters
         ----------
-        misp_object_type : str
-            The misp object name (also name of the object template)
-        values : dict
-            The needed values to populate the object
+        name : str
+            The MISP object name (also name of the object template)
+        dict_values : dict | AbstractMISPObjectGenerator
+            The values to populate the MISP object or the MISPObject itself
         event_id : int
             The event id where the object will be added to. If not provided and the MODE_DAILY is not enable it will throw an error
         """
 
         if self.mode_type == self.MODE_NORMAL and event_id is None:
             raise PyMISPHelperError("Trying to push an object without supplying an event id")
-
-        mispObjectConstructor = self.dico_object[misp_object_type]
-        mispObject = mispObjectConstructor(values)
-        if event_id is None: # Prioritize argument instead
+        elif self.mode_type == self.MODE_DAILY and event_id is None:
             event_id = self.get_daily_event_id()
-        self.push_MISP_object(event_id, misp_object_type, mispObject)
 
-    def add_sightings(self, values, uuid=None, id=None, source=None, type=0, timestamp=int(time.time())):
+        templateID = self.get_object_template(name)
+
+        if type(dict_values) is dict:
+            MISP_ObjectConstructor = self.dico_object[name]
+            MISP_Object = MISP_ObjectConstructor(dict_values)
+        elif isinstance(dict_values, AbstractMISPObjectGenerator) and dict_values.name == name:
+            MISP_Object = dict_values
+        else:
+            print("Type error")
+            return
+
+        r = self.pymisp.add_object(event_id, templateID, MISP_Object)
+        if 'errors' in r:
+            print(r)
+
+    def add_object_per_json(self, data, event_id=None):
         """
-        Make a sightings on the provided attribute values
+        Add an object to MISP from a JSON or dict
         Parameters:
         -----------
-        values : list or str
-           The value(s) to sight
+        data : JSON (str) | dict
+            The data containing information on the MISP object. Must contain the field 'name'
+        event_id : int
+            The event id where the attribute will be added to
         """
-        MISP_Sighting = MISPSighting(values, uuid=None, id=None, source=None, type=0, timestamp=int(time.time()))
-        self.push_MISP_sightings(MISP_Sighting.get_dico())
+        if type(data) is str:
+            dict_data = json.loads(data)
 
-    def add_attributes(self, attribute_type, value, event_id=None, category=None, to_ids=False, comment=None, distribution=None, proposal=False):
+        # get object name
+        try:
+            name = dict_data['name']
+            del dict_data['name']
+        except IndexError as e:
+            raise MISPObjectHasNoName("Supplied JSON does not contain name field.")
+
+        self.add_object(name, dict_data, event_id=event_id)
+
+
+    # SIGHTING
+    def add_sighting(self, value=None, uuid=None, id=None, source=None, type=0, timestamp=None, **kargs):
+        """
+        Make a single sighting
+        Parameters:
+        -----------
+        values : str
+           Value of the attribute the sighting is related too
+        uuid : str
+           UUID of the attribute to update
+        id : str
+           ID of the attriute to update
+        source : str
+           Source of the sighting
+        type : int
+           Type of the sighting (0: normal sighting, 1: false positive sighting)
+        timestamp : int
+           Timestamp associated to the sighting
+        """
+
+        r = self.pymisp.sighting(value=value, uuid=uuid, id=id, source=source, type=type, timestamp=timestamp, **kargs)
+        if 'errors' in r:
+            print(r)
+
+    def add_sighting_per_json(self, data):
+        """
+        Make a sighting
+        Parameters
+        ----------
+        json_file : JSON (str) | dict
+            Contain information about the sighting
+        """
+        if type(data) is str:
+            dict_data = json.loads(data)
+        elif type(data) is dict:
+            dict_data = data
+        else:
+            print('Type error!')
+            return
+
+        self.add_sighting(**dict_data)
+
+
+    # ATTRIBUTE
+    def add_attribute(self, type_value, value, event_id=None, category=None, to_ids=False, comment=None, distribution=None, proposal=False, **kargs):
         """
         Add an attribute to MISP
         Parameters:
         -----------
-        attribute_type : str
-            The type of the attribute
+        type_value : str
+            The type of the value
         value : str
             The value of the attribute
         event_id : int
@@ -201,78 +269,62 @@ class PyMISPHelper:
         """
         if self.mode_type == self.MODE_NORMAL and event_id is None:
             raise PyMISPHelperError("Trying to push an object without supplying an event id")
-
-        MISP_Attribute = MISPAttribute(event_id, attribute_type, value, category=category, to_ids=to_ids, comment=comment, distribution=distribution, proposal=proposal)
-        if event_id is None: # Prioritize parameters
+        elif self.mode_type == self.MODE_DAILY and event_id is None:
             event_id = self.get_daily_event_id()
-        self.push_MISP_attributes(MISP_Attribute.get_dico(), event_id=event_id)
+        event = self.pymisp.get_event(event_id)
 
+        r = self.pymisp.add_named_attribute(event, type_value=type_value, value=value, category=category, to_ids=to_ids, comment=comment, distribution=distribution, proposal=proposal, **kargs)
+        if 'errors' in r:
+            print(r)
 
-    # PUBLISHERS
-    def push_MISP_object(self, event_id, misp_object_type, mispObject):
+    def add_attribute_per_json(self, data, event_id=None, proposal=False):
         """
-        Push an object to MISP
-        From the MISP Object, compare with local object template definitions and then push it to MISP
+        Push an attribute to MISP from a JSON or dict
         Parameters
         ----------
-        event_id : int
-            The event id where the object will be added to
-        misp_object_type : str
-            The misp object name (also name of the object template)
-        mispObject : AbstractMISPObjectGenerator
-            The Misp  object with its attributes added
-        """
-        try:
-            templateID = [x['ObjectTemplate']['id'] for x in self.pymisp.get_object_templates_list() if x['ObjectTemplate']['name'] == misp_object_type][0]
-            r = self.pymisp.add_object(event_id, templateID, mispObject)
-            if 'errors' in r:
-                print(r)
-
-        except IndexError:
-            valid_types = ", ".join([x['ObjectTemplate']['name'] for x in self.pymisp.get_object_templates_list()])
-            print("Template for type %s not found! Valid types are: %s" % (self.mispTYPE, valid_types))
-
-    def push_MISP_attributes(self, attribute_dico, event_id=None):
-        """
-        Push an attribute to MISP
-        From a dictionnary, push the attribute to MISP
-        Parameters
-        ----------
+        data : JSON (str) | dict
+            The data containing information on the MISP attribute (Required: type, value)
         event_id : int
             The event id where the attribute will be added to
-        attribute dico : dict
-            A dictionnary defining value of the attribute to be added. (Required: aatribute_type, value)
+        proposal : bool
+            True or False based on whether the attributes should be proposed or directly save
         """
-        
-        # check dict validy
-        if MISPAttribute.check_validity(attribute_dico):
-            print('Attribute dictionnary is not valid - required fields {}'.format(MISPAttribute.required_fields))
+
+        if self.mode_type == self.MODE_NORMAL and event_id is None:
+            raise PyMISPHelperError("Trying to push an object without supplying an event id")
+        elif self.mode_type == self.MODE_DAILY and event_id is None:
+            event_id = self.get_daily_event_id()
+        event = self.pymisp.get_event(event_id)
+
+        if type(data) is str:
+            dict_data = json.loads(data)
+        elif type(dict_data) is dict:
+            dict_data = data
+        else:
+            print('Type error!')
             return
 
-        event_id = event_id if event_id is not None else attribute_dico['event_id'] # prioritize arguments instead of dico field
+        type_value = dict_data['type']
+        value = dict_data['value']
+        del dict_data['type']
+        del dict_data['value']
+        self.add_attribute(type_value, value, **dict_data)
+        
 
-        r = self.pymisp.add_named_attribute(
-                event_id,
-                attribute_dico['attribute_type'],
-                attribute_dico['value'],
-                category=attribute_dico.get('category', None),
-                to_ids=attribute_dico.get('to_ids', False),
-                comment=attribute_dico.get('comment', None),
-                distribution=attribute_dico.get('distribution', None),
-                proposal=attribute_dico.get('proposal', False))
-        if 'errors' in r:
-            print(r)
-
-    def push_MISP_sightings(self, sightings):
-        """
-        Make a sightings on the provided attribute
-        Push sightings (from dict or list)
-        Parameters
-        ----------
-        sighting_list : list or dict
-            The list or dict containing the sighting(s) to make
-        """
-        r = self.pymisp.set_sightings(sighting_list)
-        if 'errors' in r:
-            print(r)
-
+    # OTHERS
+    def get_object_template(self, name):
+            """
+            Get the template id for the given MISP object name
+            Parameters
+            ----------
+            name : str
+                The name of the MISP object
+            """
+            try:
+                templateID = [x['ObjectTemplate']['id'] for x in self.pymisp.get_object_templates_list() if x['ObjectTemplate']['name'] == name][0]
+                return templateID
+    
+            except IndexError:
+                valid_types = ", ".join([x['ObjectTemplate']['name'] for x in self.pymisp.get_object_templates_list()])
+                print("Template for type %s not found! Valid types are: %s" % (self.name, valid_types))
+    

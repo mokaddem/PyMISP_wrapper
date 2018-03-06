@@ -8,6 +8,7 @@ import datetime
 class CowrieMispObject(AbstractMISPObjectGenerator):
     def __init__(self, dico_val, **kargs):
         self._dico_val = dico_val
+        self.name = "cowrie"
 
         super(CowrieMispObject, self).__init__('cowrie', **kargs)
         self.generate_attributes()

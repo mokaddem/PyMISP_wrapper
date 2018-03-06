@@ -11,20 +11,28 @@ A simple PyMISP wrapper designed to ease the addition of commonly used operation
 >>> pmhelper.daily_mode("honeypot_1")
 
 # add an attribute to MISP, as daily mode is activated, no need to supply an event id
->>> pmhelper.add_attributes("ip-src", "8.8.8.8", category="Network Activity")
+>>> pmhelper.add_attributes("ip-src", "8.8.8.8", category="Network activity")
 
 # exactly the same as the previous line
->>> pmhelper.push_MISP_attributes({"attribute_type": "ip-src", "value": "8.8.8.8", "category": "Network Activity"})
+>>> pmhelper.add_attribute_per_json(json.dumps({"type": "ip-src", "value": "8.8.8.8", "category": "Network activity"}))
 
-# add an object to MISP, again no need to give an event id
+# add an object to MISP, again there is no need to give an event id
 >>> pmhelper.add_object("cowrie", {"session": "session_id", "username": "admin", "password": "admin", "protocol": "telnet"})
 
-# perform a sighting on 8.8.8.8 and 9.9.9.9 
->>> pmhelper.add_sightings(["8.8.8.8", "9.9.9.9"], timestamp=time.time())
+# exactly the same as the previous line
+>>> cowrie_obj = CowrieMispObject({"session": "session_id", "username": "admin", "password": "admin", "protocol": "telnet"})
+>>> pmhelper.add_object("cowrie", cowrie_obj)
 
 # exactly the same as the previous line
->>> pmhelper.MISP_sightings({"values": ["8.8.8.8", "9.9.9.9"], "timestamp": time.time()})
+>>> pmhelper.add_object_per_json(json.dumps({"name": "cowrie", "session": "session_id", "username": "root", "password": "root", "protocol": "ssh"}))
+
+# perform a sighting on attribute uuid ... 
+>>> pmhelper.add_sighting(uuid="5a9e6785-2400-4b6a-a707-4581950d210f")
+
+# exactly the same as the previous line
+>>> pmhelper.add_sighting_per_json(json.dumps({"uuid": "5a9e6785-2400-4b6a-a707-4581950d210f"}))
 ```
+
 
 ## RedisToMISP
 ``RedisToMISP`` Pops items from redis and performs the requested action like adding an attribute, adding an object or making a sighting.
