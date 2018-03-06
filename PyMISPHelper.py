@@ -32,7 +32,7 @@ class PyMISPHelper:
     MODE_NORMAL = 1
     MODE_DAILY = 2
 
-    def __init__(self, pymisp, mode_type=MODE_NORMAL, daily_event_name='unset_daily_event_name'):
+    def __init__(self, pymisp, mode_type=MODE_NORMAL, daily_event_name='unset_daily_event_name', verbose=False):
         """
         Create a PyMISP interface to easily add attributes, objects or sightings to events especially for events that should be generated on a daily basis
         Parameters:
@@ -61,6 +61,7 @@ class PyMISPHelper:
         self.pymisp = pymisp
         self.mode_type = mode_type
         self.current_date = None # Avoid querying MISP every time an attribute is added
+        self.verbose = verbose
         if self.mode_type == self.MODE_DAILY:
             daily_mode(daily_event_name)
 
@@ -69,6 +70,9 @@ class PyMISPHelper:
                 'cowrie': CowrieMispObject
         }
 
+    def log(self, msg):
+        if self.verbose:
+            print(msg)
 
     def normal_mode():
         """
@@ -114,12 +118,12 @@ class PyMISPHelper:
             info = dic['info']
             e_id = dic['id']
             if info == to_match:
-                print('Found: ', info, '->', e_id)
+                self.log('Found: ' + info + '->' + e_id)
                 self.current_date = datetime.date.today()
                 return int(e_id)
         created_event = self.create_daily_event()['Event']
         new_id = created_event['id']
-        print('New event created:', new_id)
+        self.log('New event created: ' + new_id)
         self.current_date = datetime.date.today()
         return int(new_id)
 
@@ -181,7 +185,7 @@ class PyMISPHelper:
         elif isinstance(dict_values, AbstractMISPObjectGenerator) and dict_values.name == name:
             MISP_Object = dict_values
         else:
-            print("Type error")
+            self.log("Type error")
             return
 
         r = self.pymisp.add_object(event_id, templateID, MISP_Object)
@@ -248,7 +252,7 @@ class PyMISPHelper:
         elif type(data) is dict:
             dict_data = data
         else:
-            print('Type error!')
+            self.log('Type error!')
             return
 
         self.add_sighting(**dict_data)
@@ -301,7 +305,7 @@ class PyMISPHelper:
         elif type(dict_data) is dict:
             dict_data = data
         else:
-            print('Type error!')
+            self.log('Type error!')
             return
 
         type_value = dict_data['type']
