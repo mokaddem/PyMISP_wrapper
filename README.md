@@ -1,6 +1,19 @@
 # PyMISP-wrapper
 A simple PyMISP wrapper designed to ease the addition of commonly used operations on daily generated event. 
 
+## Installation
+
+- ``virtualenv -p python3 wrapenv``
+- ``. ./wrapenv/bin/activate``
+- ``pip3 install pymisp redis``
+
+## Usage
+
+- Activate the virtualenv: ``. ./wrapenv/bin/activate``
+- If you want to avoid passing your MISP url and API key by argument, you can:
+    - Copy your key: ``cp MISPKeys.py.dist MISPKeys.py``
+    - Fill the fields
+
 ## PyMISPHelper
 
 ### Examples
