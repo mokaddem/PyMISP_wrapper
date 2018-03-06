@@ -191,6 +191,7 @@ class PyMISPHelper:
         r = self.pymisp.add_object(event_id, templateID, MISP_Object)
         if 'errors' in r:
             print(r)
+            return r
 
     def add_object_per_json(self, data, event_id=None):
         """
@@ -208,7 +209,7 @@ class PyMISPHelper:
             dict_data = data
         else:
             self.log('Type error!')
-            return
+            return 'error'
 
         # get object name
         try:
@@ -217,7 +218,7 @@ class PyMISPHelper:
         except IndexError as e:
             raise MISPObjectHasNoName("Supplied JSON does not contain name field.")
 
-        self.add_object(name, dict_data, event_id=event_id)
+        return self.add_object(name, dict_data, event_id=event_id)
 
 
     # SIGHTING
@@ -243,6 +244,7 @@ class PyMISPHelper:
         r = self.pymisp.sighting(value=value, uuid=uuid, id=id, source=source, type=type, timestamp=timestamp, **kargs)
         if 'errors' in r:
             print(r)
+            return r
 
     def add_sighting_per_json(self, data):
         """
@@ -258,9 +260,9 @@ class PyMISPHelper:
             dict_data = data
         else:
             self.log('Type error!')
-            return
+            return 'error'
 
-        self.add_sighting(**dict_data)
+        return self.add_sighting(**dict_data)
 
 
     # ATTRIBUTE
@@ -285,6 +287,7 @@ class PyMISPHelper:
         r = self.pymisp.add_named_attribute(event, type_value=type_value, value=value, category=category, to_ids=to_ids, comment=comment, distribution=distribution, proposal=proposal, **kargs)
         if 'errors' in r:
             print(r)
+            return r
 
     def add_attribute_per_json(self, data, event_id=None, proposal=False):
         """
@@ -311,13 +314,13 @@ class PyMISPHelper:
             dict_data = data
         else:
             self.log('Type error!')
-            return
+            return 'error'
 
         type_value = dict_data['type']
         value = dict_data['value']
         del dict_data['type']
         del dict_data['value']
-        self.add_attribute(type_value, value, **dict_data)
+        return self.add_attribute(type_value, value, **dict_data)
         
 
     # OTHERS

@@ -50,12 +50,7 @@ class RedisToMISP:
     SUFFIX_OBJ = '_object'
     SUFFIX_LIST = [SUFFIX_SIGH, SUFFIX_ATTR, SUFFIX_OBJ]
 
-    def __init__(self, host, port, db, keynames, PyMISPHelper, sleep=1, event_id=None, daily_event_name=None):
-        global e, t
-        e = threading.Event()
-        t = threading.Thread(name="processing-animation", target=processing_animation, args=(e,))
-        t.start()
-
+    def __init__(self, host, port, db, keynames, PyMISPHelper, sleep=1, event_id=None, daily_event_name=None, keynameError=None):
         self.host = host
         self.port = port
         self.db = db
@@ -66,6 +61,7 @@ class RedisToMISP:
         self.sleep = sleep
         self.event_id = event_id
         self.event_name = daily_event_name
+        self.keynameError = keynameError
 
         self.serv = redis.StrictRedis(self.host, self.port, self.db, decode_responses=True)
         self.pymisphelper = PyMISPHelper
@@ -83,7 +79,8 @@ class RedisToMISP:
                     try:
                         self.perform_action(key, data)
                     except Exception as e:
-                        print('Error', e)
+                        self.save_error_to_redis(e, data)
+
             beautyful_sleep(5)
 
     def pop(self, key):
@@ -93,9 +90,9 @@ class RedisToMISP:
         try:
             popped = json.loads(popped)
         except ValueError as e:
-            pass
+            self.save_error_to_redis(e, popped)
         except ValueError as e:
-            pass
+            self.save_error_to_redis(e, popped)
         return popped
 
 
@@ -106,30 +103,34 @@ class RedisToMISP:
         # sighting
         if key.endswith(self.SUFFIX_SIGH):
             self.print_processing(self.SUFFIX_SIGH, t)
-            self.pymisphelper.add_sighting_per_json(data)
+            r = self.pymisphelper.add_sighting_per_json(data)
 
         # attribute
         elif key.endswith(self.SUFFIX_ATTR):
             self.print_processing(self.SUFFIX_ATTR, t)
-            self.pymisphelper.add_attribute_per_json(data, event_id=self.event_id)
+            r = self.pymisphelper.add_attribute_per_json(data, event_id=self.event_id)
 
         # object
         elif key.endswith(self.SUFFIX_OBJ):
             self.print_processing(self.SUFFIX_OBJ, t)
-            self.pymisphelper.add_object_per_json(data, event_id=self.event_id)
+            r = self.pymisphelper.add_object_per_json(data, event_id=self.event_id)
 
         else:
             raise NoValidKey("Can't define action to perform")
         e.set()
         t.join()
 
-    def validate_key(self, k):
-        return self.SUFFIX_SIGH in k or self.SUFFIX_ATTR in k or self.SUFFIX_OBJ in k
+        if 'errors' in r:
+            self.save_error_to_redis(r, data)
 
     def print_processing(self, key, t):
         key = key.lstrip('_')
         print('Adding %s' % key + ' '*20) # fill to overwrite already progressbar character
         t.start()
+
+    def save_error_to_redis(self, error, item):
+        to_push = {'error': str(error), 'item': str(item)}
+        self.serv.lpush(self.keynameError, to_push)
 
 class MISPItemToRedis:
     SUFFIX_SIGH = '_sighting'
@@ -224,8 +225,10 @@ if __name__ == '__main__':
                         help="The redis DB number")
     parser.add_argument("-k", "--keynamePop", type=str, nargs='+', required=True,
             help="The keynames to POP element from.")
+    parser.add_argument("--eventname", type=str, required=True,
+                        help="The daily event name to be used in MISP. (e.g. honeypot_1, will produce each day an event of the form honeypot_1 dd-mm-yyyy")
     parser.add_argument("-s", "--sleep", type=int, default=1,
-                        help="The time between each check")
+                        help="Redis pooling time")
 
     # PyMISPHelper
     if flag_MISPKeys:
@@ -239,8 +242,6 @@ if __name__ == '__main__':
                         help="Should the certificate be verified")
     parser.add_argument("--dailymode", action="store_true",
                         help="By enabling this mode, all push to redis will be stored in the daily event")
-    parser.add_argument("--eventname", type=str, required=True,
-                        help="The daily event name to be used in MISP. (e.g. honeypot_1, will produce each day an event of the form honeypot_1 dd-mm-yyyy")
     parser.add_argument("--eventid", type=int, default=None,
                         help="The MISP event id in which to put data. Overwrite dailymode")
     parser.add_argument("--keynameError", type=str, default='RedisToMisp_Error',
@@ -259,7 +260,7 @@ if __name__ == '__main__':
     PyMISPHelper = PyMISPHelper(pymisp, mode_type=args.dailymode, daily_event_name=args.eventname)
 
 
-    redisToMISP = RedisToMISP(args.host, args.port, args.db, args.keynamePop, PyMISPHelper, sleep=args.sleep, event_id=args.eventid, daily_event_name=args.eventname)
+    redisToMISP = RedisToMISP(args.host, args.port, args.db, args.keynamePop, PyMISPHelper, sleep=args.sleep, event_id=args.eventid, daily_event_name=args.eventname, keynameError=args.keynameError)
     try:
         redisToMISP.consume()
     except (KeyboardInterrupt, SystemExit):
