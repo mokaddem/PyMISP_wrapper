@@ -215,7 +215,7 @@ class MISPItemToRedis:
         self.serv.lpush(key, jdata)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Pop item fom redis and perfoms the requested action. By default, each action are pushed into a daily named event")
 
     parser.add_argument("--host",  type=str, default='127.0.0.1',
                         help="The redis host")
@@ -240,10 +240,8 @@ if __name__ == '__main__':
                         help="The MISP API key")
     parser.add_argument("--verifycert", action="store_true", default=True,
                         help="Should the certificate be verified")
-    parser.add_argument("--dailymode", action="store_true",
-                        help="By enabling this mode, all push to redis will be stored in the daily event")
     parser.add_argument("--eventid", type=int, default=None,
-                        help="The MISP event id in which to put data. Overwrite dailymode")
+                        help="The MISP event id in which to put data. Overwrite eventname and disable daily mode")
     parser.add_argument("--keynameError", type=str, default='RedisToMisp_Error',
                         help="The redis list keyname in which to put items that generated an error")
 
@@ -257,7 +255,7 @@ if __name__ == '__main__':
         pymisp = PyMISP(args.url, args.mispkey, args.verifycert)
     except PyMISPError as e:
         print(e)
-    PyMISPHelper = PyMISPHelper(pymisp, mode_type=args.dailymode, daily_event_name=args.eventname)
+    PyMISPHelper = PyMISPHelper(pymisp, daily_event_name=args.eventname)
 
 
     redisToMISP = RedisToMISP(args.host, args.port, args.db, args.keynamePop, PyMISPHelper, sleep=args.sleep, event_id=args.eventid, daily_event_name=args.eventname, keynameError=args.keynameError)

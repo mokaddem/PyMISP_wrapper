@@ -56,14 +56,19 @@ A simple PyMISP wrapper designed to ease the addition of commonly used operation
 >>> helper.push_sighting(uuid="5a9e9e26-fe40-4726-8563-5585950d210f")
 ```
 
-### Redis consumer example
+### Redis consumer
 
 ```
+example: python3 RedisToMISP.py -k redis_key1 redis_key2 --eventname honeypot_1
+This command will pop item from both redis list 'redis_key1' and 'redis_key2' and push popped items in the daily event named 'honeypot_1 yyyy-mm-dd'
+
 usage: RedisToMISP.py [-h] [--host HOST] [-p PORT] [-n DB] -k KEYNAMEPOP
                       [KEYNAMEPOP ...] --eventname EVENTNAME [-s SLEEP]
                       [-u URL] [--mispkey MISPKEY] [--verifycert]
-                      [--dailymode] [--eventid EVENTID]
-                      [--keynameError KEYNAMEERROR]
+                      [--eventid EVENTID] [--keynameError KEYNAMEERROR]
+
+Pop item fom redis and perfoms the requested action. By default, each action
+are pushed into a daily named event
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -75,16 +80,14 @@ optional arguments:
   --eventname EVENTNAME
                         The daily event name to be used in MISP. (e.g.
                         honeypot_1, will produce each day an event of the form
-                        honeypot_1 yyyy-mm-dd
+                        honeypot_1 dd-mm-yyyy
   -s SLEEP, --sleep SLEEP
                         Redis pooling time
   -u URL, --url URL     The MISP URL to connect to
   --mispkey MISPKEY     The MISP API key
   --verifycert          Should the certificate be verified
-  --dailymode           By enabling this mode, all push to redis will be
-                        stored in the daily event
   --eventid EVENTID     The MISP event id in which to put data. Overwrite
-                        dailymode
+                        eventname and disable daily mode
   --keynameError KEYNAMEERROR
                         The redis list keyname in which to put items that
                         generated an error
