@@ -204,6 +204,11 @@ class PyMISPHelper:
         """
         if type(data) is str:
             dict_data = json.loads(data)
+        elif type(data) is dict:
+            dict_data = data
+        else:
+            self.log('Type error!')
+            return
 
         # get object name
         try:
@@ -302,7 +307,7 @@ class PyMISPHelper:
 
         if type(data) is str:
             dict_data = json.loads(data)
-        elif type(dict_data) is dict:
+        elif type(data) is dict:
             dict_data = data
         else:
             self.log('Type error!')
