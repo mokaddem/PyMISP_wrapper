@@ -127,23 +127,23 @@ class PyMISPHelper:
         self.current_date = datetime.date.today()
         return int(new_id)
 
-    def create_daily_event(self):
+    def create_daily_event(self, distribution=0, threat_level_id=3, analysis=0, date=None, published=False, orgc_id=None, org_id=None, sharing_group_id=None):
         """
         Create the daily event id on MISP
         """
         today = datetime.date.today()
-        distribution = 0 # [0-3]
+        distribution = distribution # [0-3]
         info = self.daily_event_name.format(today)
-        analysis = 0 # [0-2]
-        threat = 3 # [1-4]
-        published = False
-        org_id = None
-        orgc_id = None
-        sharing_group_id = None
-        date = None
-        event = self.pymisp.new_event(distribution, threat,
-                    analysis, info, date,
-                    published, orgc_id, org_id, sharing_group_id)
+        analysis = analysis # [0-2]
+        threat_level_id = threat_level_id # [1-4]
+        published = published
+        org_id = org_id
+        orgc_id = orgc_id
+        sharing_group_id = sharing_group_id
+        date = date
+        event = self.pymisp.new_event(distribution=distribution, threat_level_id=threat_level_id,
+                    analysis=analysis, info=info, date=date,
+                    published=published, orgc_id=orgc_id, org_id=org_id, sharing_group_id=sharing_group_id)
         return event
 
     def get_daily_event_id(self):
@@ -155,7 +155,7 @@ class PyMISPHelper:
                 self.eventID_to_push = self.fetch_daily_event_id()
             return self.eventID_to_push
         else:
-            return None
+            raise NotInEventMode('Daily mode not activated')
 
 
     # OBJECT
