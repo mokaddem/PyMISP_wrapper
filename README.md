@@ -3,6 +3,8 @@ A simple PyMISP wrapper designed to ease the addition of commonly used operation
 
 ## Installation
 
+Start ``install-deps.sh`` script: ``bash install-deps.sh``
+Or do it manually
 - ``virtualenv -p python3 wrapenv``
 - ``. ./wrapenv/bin/activate``
 - ``pip3 install pymisp redis``
