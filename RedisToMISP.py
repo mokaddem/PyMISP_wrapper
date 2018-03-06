@@ -262,6 +262,7 @@ if __name__ == '__main__':
     try:
         redisToMISP.consume()
     except (KeyboardInterrupt, SystemExit):
-        e.set()
-        t.join()
+        if e is not None:
+            e.set()
+            t.join()
 
