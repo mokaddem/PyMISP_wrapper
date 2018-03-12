@@ -1,29 +1,26 @@
 #!/usr/bin/env python3
 
+import json
+import datetime
+
 from pymisp.tools.abstractgenerator import AbstractMISPObjectGenerator
-from pymisp.exceptions import PyMISPError
-from pymisp import PyMISP, MISPAttribute
-import pymisp
-
 from CowrieMISPObject import CowrieMispObject
-
-try:
-    from MISPKeys import misp_url, misp_key
-    flag_MISPKeys = True
-except ImportError:
-    flag_MISPKeys = False
-
-import json, datetime, time, argparse
 
 
 class PyMISPHelperError(Exception):
     def __init__(self, message):
         super(PyMISPHelperError, self).__init__(message)
         self.message = message
+
+
 class MissingID(PyMISPHelperError):
     pass
+
+
 class NotInEventMode(PyMISPHelperError):
     pass
+
+
 class MISPObjectHasNoName(PyMISPHelperError):
     pass
 
@@ -32,19 +29,27 @@ class PyMISPHelper:
     MODE_NORMAL = 1
     MODE_DAILY = 2
 
-    def __init__(self, pymisp, mode_type=MODE_NORMAL, daily_event_name='unset_daily_event_name', verbose=False):
+    def __init__(self, pymisp, mode_type=MODE_NORMAL,
+                 daily_event_name='unset_daily_event_name', verbose=False):
         """
-        Create a PyMISP interface to easily add attributes, objects or sightings to events especially for events that should be generated on a daily basis
+        Create a PyMISP interface to easily add attributes, objects or
+        sightings to events especially for events that should be generated
+        on a daily basis
+
         Parameters:
         -----------
         pymisp : PyMISP
             A valid PyMISP object
         mode_type : int
-            The mode in which this object will behave: 
+            The mode in which this object will behave:
             MODE_NORMAL will require an event_id for most of the operations
-            MODE_DAILY will query MISP to get the correct event ID related with daily_event_name
+            MODE_DAILY will query MISP to get the correct event ID related
+                with daily_event_name
         daily_event_name : str
-            The name of the daily event. (It will have the following format on MISP: daily_event_name YYYY-MM-DD)
+            The name of the daily event.
+            It will have the following format on MISP:
+                daily_event_name YYYY-MM-DD
+
         Examples:
         ---------
         >>> pymisp = PyMISP(misp_url, misp_key)
@@ -60,10 +65,11 @@ class PyMISPHelper:
 
         self.pymisp = pymisp
         self.mode_type = mode_type
-        self.current_date = None # Avoid querying MISP every time an attribute is added
+        # Avoid querying MISP every time an attribute is added
+        self.current_date = None
         self.verbose = verbose
         if self.mode_type == self.MODE_DAILY:
-            daily_mode(daily_event_name)
+            self.daily_mode(daily_event_name)
 
         # Map object_name with their constructor
         self.dico_object = {
@@ -74,24 +80,27 @@ class PyMISPHelper:
         if self.verbose:
             print(msg)
 
-    def normal_mode():
+    def normal_mode(self):
         """
         Switch to normal mode
         """
         self.mode_type = self.MODE_NORMAL
 
-    # DAILY 
+    # DAILY
     def daily_mode(self, daily_event_name):
         """
         Switch to daily mode
-        Daily mode can be use to automatically create and get daily event for a given name.
+        Daily mode can be use to automatically create and get daily event
+        for a given name.
         Parameters:
         -----------
         daily_event_name : str
-            The name of the daily event. (It will have the following format on MISP: daily_event_name YYYY-MM-DD)
+            The name of the daily event.
+            It will have the following format on MISP:
+                daily_event_name YYYY-MM-DD
         """
         self.current_date = None
-        self.daily_event_name = daily_event_name+' {}' # used by format
+        self.daily_event_name = daily_event_name+' {}'  # used by format
         self.mode_type = self.MODE_DAILY
         self.eventID_to_push = self.get_daily_event_id()
 
@@ -103,7 +112,11 @@ class PyMISPHelper:
         results = self.pymisp.search_index(eventinfo=to_search)
         events = []
         for e in results['response']:
-            events.append({'id': e['id'], 'org_id': e['org_id'], 'info': e['info']})
+            events.append({
+                'id': e['id'],
+                'org_id': e['org_id'],
+                'info': e['info']
+            })
         return events
 
     def fetch_daily_event_id(self):
@@ -127,23 +140,27 @@ class PyMISPHelper:
         self.current_date = datetime.date.today()
         return int(new_id)
 
-    def create_daily_event(self, distribution=0, threat_level_id=3, analysis=0, date=None, published=False, orgc_id=None, org_id=None, sharing_group_id=None):
+    def create_daily_event(self, distribution=0, threat_level_id=3,
+                           analysis=0, date=None, published=False,
+                           orgc_id=None, org_id=None, sharing_group_id=None):
         """
         Create the daily event id on MISP
         """
         today = datetime.date.today()
-        distribution = distribution # [0-3]
+        distribution = distribution  # [0-3]
         info = self.daily_event_name.format(today)
-        analysis = analysis # [0-2]
-        threat_level_id = threat_level_id # [1-4]
+        analysis = analysis  # [0-2]
+        threat_level_id = threat_level_id  # [1-4]
         published = published
         org_id = org_id
         orgc_id = orgc_id
         sharing_group_id = sharing_group_id
         date = date
-        event = self.pymisp.new_event(distribution=distribution, threat_level_id=threat_level_id,
+        event = self.pymisp.new_event(distribution=distribution,
+                    threat_level_id=threat_level_id,
                     analysis=analysis, info=info, date=date,
-                    published=published, orgc_id=orgc_id, org_id=org_id, sharing_group_id=sharing_group_id)
+                    published=published, orgc_id=orgc_id, org_id=org_id,
+                    sharing_group_id=sharing_group_id)
         return event
 
     def get_daily_event_id(self):
@@ -151,7 +168,7 @@ class PyMISPHelper:
         Return the correct event id if daily mode is activated
         """
         if self.mode_type == self.MODE_DAILY:
-            if self.current_date != datetime.date.today(): #refresh id
+            if self.current_date != datetime.date.today():  # refresh id
                 self.eventID_to_push = self.fetch_daily_event_id()
             return self.eventID_to_push
         else:
@@ -173,7 +190,7 @@ class PyMISPHelper:
         """
 
         if self.mode_type == self.MODE_NORMAL and event_id is None:
-            raise PyMISPHelperError("Trying to push an object without supplying an event id")
+            raise MissingID("Trying to push an object without supplying an event id")
         elif self.mode_type == self.MODE_DAILY and event_id is None:
             event_id = self.get_daily_event_id()
 
@@ -279,12 +296,14 @@ class PyMISPHelper:
             The event id where the attribute will be added to
         """
         if self.mode_type == self.MODE_NORMAL and event_id is None:
-            raise PyMISPHelperError("Trying to push an object without supplying an event id")
+            raise MissingID("Trying to push an object without supplying an event id")
         elif self.mode_type == self.MODE_DAILY and event_id is None:
             event_id = self.get_daily_event_id()
         event = self.pymisp.get_event(event_id)
 
-        r = self.pymisp.add_named_attribute(event, type_value=type_value, value=value, category=category, to_ids=to_ids, comment=comment, distribution=distribution, proposal=proposal, **kargs)
+        r = self.pymisp.add_named_attribute(event, type_value=type_value,
+            value=value, category=category, to_ids=to_ids, comment=comment,
+            distribution=distribution, proposal=proposal, **kargs)
         if 'errors' in r:
             print(r)
             return r
@@ -303,10 +322,9 @@ class PyMISPHelper:
         """
 
         if self.mode_type == self.MODE_NORMAL and event_id is None:
-            raise PyMISPHelperError("Trying to push an object without supplying an event id")
+            raise MissingID("Trying to push an object without supplying an event id")
         elif self.mode_type == self.MODE_DAILY and event_id is None:
             event_id = self.get_daily_event_id()
-        event = self.pymisp.get_event(event_id)
 
         if type(data) is str:
             dict_data = json.loads(data)
@@ -320,8 +338,12 @@ class PyMISPHelper:
         value = dict_data['value']
         del dict_data['type']
         del dict_data['value']
-        return self.add_attribute(type_value, value, **dict_data)
-        
+        return self.add_attribute(type_value, value, event_id=event_id, **dict_data)
+
+    # FEED
+    def feed_register(self):
+        pass
+
 
     # OTHERS
     def get_object_template(self, name):
@@ -335,8 +357,7 @@ class PyMISPHelper:
             try:
                 templateID = [x['ObjectTemplate']['id'] for x in self.pymisp.get_object_templates_list() if x['ObjectTemplate']['name'] == name][0]
                 return templateID
-    
+
             except IndexError:
                 valid_types = ", ".join([x['ObjectTemplate']['name'] for x in self.pymisp.get_object_templates_list()])
                 print("Template for type %s not found! Valid types are: %s" % (self.name, valid_types))
-    
